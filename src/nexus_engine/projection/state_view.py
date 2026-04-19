@@ -5,6 +5,7 @@ from typing import Any, AsyncIterator
 
 from nexus_engine.core.entity import Entity
 from nexus_engine.core.event import Event, StateChange
+from nexus_engine.core.tag_index import TagInvertedIndex
 from nexus_engine.core.value_objects import EntityId, GameTime, Tag
 from nexus_engine.store.event_store import EventStore
 from nexus_engine.store.snapshot_store import Snapshot, SnapshotStore
@@ -47,6 +48,7 @@ class StateView:
         self.event_store = event_store
         self.snapshot_store = snapshot_store
         self._entity_cache: dict[EntityId, Entity] = {}
+        self._tag_index = TagInvertedIndex()
         self._current_time: GameTime = GameTime(0)
 
     async def get_entity(self, id: EntityId, depth: int = 1) -> Entity | None:
@@ -58,6 +60,18 @@ class StateView:
         if id in self._entity_cache:
             return True
         return False
+
+    def find_by_tag(self, tag: str) -> list[Entity]:
+        entity_ids = self._tag_index.get_entities_with_tag(tag)
+        return [self._entity_cache[EntityId(eid)] for eid in entity_ids if EntityId(eid) in self._entity_cache]
+
+    def find_by_tags_and(self, tags: list[str]) -> list[Entity]:
+        entity_ids = self._tag_index.get_entities_with_tags_and(tags)
+        return [self._entity_cache[EntityId(eid)] for eid in entity_ids if EntityId(eid) in self._entity_cache]
+
+    def find_by_tags_or(self, tags: list[str]) -> list[Entity]:
+        entity_ids = self._tag_index.get_entities_with_tags_or(tags)
+        return [self._entity_cache[EntityId(eid)] for eid in entity_ids if EntityId(eid) in self._entity_cache]
 
     async def get_location_snapshot(
         self, loc: EntityId, aspects: list[str]
@@ -169,6 +183,24 @@ class StateView:
 
     def add_entity(self, entity: Entity) -> None:
         self._entity_cache[entity.id] = entity
+        tag_strs = [str(t) for t in entity.tags]
+        self._tag_index.add_entity(str(entity.id), frozenset(tag_strs))
+
+    def update_entity_tags(self, entity_id: EntityId, tags: frozenset[Tag]) -> None:
+        if entity_id in self._entity_cache:
+            entity = self._entity_cache[entity_id]
+            new_entity = Entity(
+                id=entity.id,
+                archetype=entity.archetype,
+                tags=tags,
+                properties=entity.properties,
+                observations=entity.observations,
+                created_at=entity.created_at,
+                canon_locked=entity.canon_locked,
+            )
+            self._entity_cache[entity_id] = new_entity
+            tag_strs = [str(t) for t in tags]
+            self._tag_index.update_entity_tags(str(entity_id), frozenset(tag_strs))
 
     @property
     def current_time(self) -> GameTime:
