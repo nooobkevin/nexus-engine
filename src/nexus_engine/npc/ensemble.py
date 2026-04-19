@@ -5,7 +5,7 @@ from typing import Any
 
 from nexus_engine.agents.llm_interface import LLMInterface
 from nexus_engine.core.entity import Entity, PersonaContract
-from nexus_engine.core.event import Event, MechanicsResult
+from nexus_engine.core.event import Event, EventType, MechanicsResult
 from nexus_engine.core.value_objects import EntityId, EntityRef, GameTime
 from nexus_engine.npc.drives import NPCContext, get_default_drives
 from nexus_engine.npc.goals import GoalGenerator, GoalPriorityQueue, SimplePlanner
@@ -41,7 +41,7 @@ async def npc_tick(
 
     goals = await goal_generator.generate(npc, context)
 
-    if goals.empty():
+    if not goals.goals:
         return events
 
     current_goal = goals.top()
@@ -83,7 +83,7 @@ async def execute_action(
         mechanics=mechanics,
         effects=[],
         narrative_summary=narrative,
-        targets=[t.id for t in targets if t],
+        targets=targets,
     )
 
     return event
@@ -100,8 +100,9 @@ async def ensemble_scene(
 
     personas = []
     for npc in npcs:
-        if hasattr(npc, "persona_contract") and npc.persona_contract:
-            personas.append(npc.persona_contract)
+        contract = getattr(npc, "persona_contract", None)
+        if contract:
+            personas.append(contract)
         else:
             personas.append(PersonaContract(
                 persona_id=str(npc.id),
@@ -144,7 +145,7 @@ async def ensemble_scene(
             npc = npcs[beat.speaker_index]
             event = Event.create(
                 game_time=context.world_time,
-                event_type="conversation",
+                event_type=EventType.CONVERSATION,
                 actor=EntityRef(id=npc.id),
                 location=EntityRef(id=context.current_location),
                 mechanics=MechanicsResult(success=True, degree=0.5),

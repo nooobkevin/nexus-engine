@@ -12,6 +12,12 @@ class CanonFact:
     source: str
     confidence: float = 1.0
 
+    def as_claim(self) -> Claim:
+        parts = self.claim.split(":")
+        if len(parts) >= 3:
+            return Claim(subject=parts[0], predicate=parts[1], object=parts[2])
+        return Claim(subject=self.claim, predicate="", object="")
+
 
 @dataclass
 class Claim:

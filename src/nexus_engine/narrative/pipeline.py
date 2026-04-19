@@ -6,7 +6,7 @@ from typing import Any
 from nexus_engine.agents.context_builder import SceneContext
 from nexus_engine.agents.llm_interface import ChatMessage, LLMInterface
 from nexus_engine.core.entity import Entity
-from nexus_engine.core.event import Event
+from nexus_engine.core.event import Event, EventDraft, EventType
 from nexus_engine.core.value_objects import EntityId, EntityRef, GameTime, Tag
 from nexus_engine.memory.memory_system import MemorySystem
 from nexus_engine.rules.rule_engine import resolve_action
@@ -54,14 +54,17 @@ async def process_player_action(
 
     outcome = await _resolve_action(intent, working_context, state_view)
 
-    events = _outcome_to_events(outcome, intent, context.current_time)
+    drafts = _outcome_to_events(outcome, intent, context.current_time)
 
-    for event in events:
-        validation = await validator.validate_event(event)
+    for draft in drafts:
+        validation = await validator.validate_event(draft)
         if validation.failed:
-            events = _rebalance_events(events, validation.violations)
+            drafts = _rebalance_events(drafts, validation.violations)
             break
 
+    events = [draft.to_event(context.current_time) for draft in drafts]
+
+    for event in events:
         await event_store.append(event)
         await state_view.apply(event)
 
@@ -139,44 +142,48 @@ async def _resolve_action(
     context: WorkingContext,
     state_view: Any,
 ) -> Any:
+    actor = context.relevant_entities[0] if context.relevant_entities else None
+    if actor is None:
+        from nexus_engine.core.ability import Outcome
+        from nexus_engine.core.ability import EffectTemplate
+        return Outcome(success=False, degree=0.0, mechanics=None, effects=frozenset())
     return await resolve_action(
         state_view.rule_engine,
         intent.action_type,
-        context.relevant_entities[0] if context.relevant_entities else None,
+        actor,
         None,
         {"tags": intent.tags, "parameters": intent.parameters},
     )
 
 
-def _outcome_to_events(outcome: Any, intent: Intent, game_time: GameTime, working_context: WorkingContext | None = None) -> list[Event]:
+def _outcome_to_events(outcome: Any, intent: Intent, game_time: GameTime, working_context: WorkingContext | None = None) -> list[EventDraft]:
     if not outcome or not outcome.success:
         return []
 
     location_ref = intent.implied_location
     if not location_ref and working_context:
-        location_ref = EntityRef(id=working_context.scene.location.id)
+        location_ref = EntityRef(id=EntityId(working_context.scene.location.id))
     if not location_ref:
         location_ref = intent.actor_ref
 
-    event = Event.create(
-        game_time=game_time,
-        event_type=intent.action_type,
+    draft = EventDraft(
+        type=EventType(intent.action_type),
         actor=intent.actor_ref,
+        targets=[t for t in intent.targets],
         location=location_ref,
         mechanics=outcome.mechanics,
         effects=[],
         narrative_summary=outcome.narrative or "Action performed",
-        targets=[t.id for t in intent.targets],
     )
 
-    return [event]
+    return [draft]
 
 
 def _rebalance_events(
-    events: list[Event],
+    drafts: list[EventDraft],
     violations: list[Any],
-) -> list[Event]:
-    return events
+) -> list[EventDraft]:
+    return drafts
 
 
 async def _generate_narrative(

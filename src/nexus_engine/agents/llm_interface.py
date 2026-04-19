@@ -132,3 +132,25 @@ Parse the user's intent and return a structured action.
             "targets": [],
             "parameters": {},
         }
+
+    async def generate_ensemble(
+        self,
+        personas: list[Any],
+        internal_states: list[dict[str, Any]],
+        context: Any,
+    ) -> Any:
+        from dataclasses import dataclass
+
+        @dataclass
+        class EnsembleBeat:
+            speaker_index: int
+            content: str
+            action: str | None = None
+
+        @dataclass
+        class EnsembleScript:
+            beats: list[EnsembleBeat]
+
+        return EnsembleScript(beats=[
+            EnsembleBeat(speaker_index=0, content="Mock ensemble response", action=None),
+        ])

@@ -6,9 +6,6 @@ from typing import TYPE_CHECKING, AsyncIterator
 from nexus_engine.core.event import Event
 from nexus_engine.core.value_objects import EventId, GameTime
 
-if TYPE_CHECKING:
-    from nexus_engine.store.event_store import EventFilter
-
 
 class EventStore(ABC):
     @abstractmethod

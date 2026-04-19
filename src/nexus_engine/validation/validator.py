@@ -132,7 +132,7 @@ class Validator:
                 )
 
         for ref in ruling.referenced_entities:
-            if not await self._entity_exists(ref):
+            if not await self._entity_exists(EntityId(ref)):
                 violations.append(
                     ValidationViolation(
                         code="DANGLING_REF",

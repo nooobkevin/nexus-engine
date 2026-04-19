@@ -41,12 +41,13 @@ class WorldSimulator:
         for region in regions.get(RegionType.ACTIVE, []):
             for npc in region.npcs:
                 from nexus_engine.npc.drives import NPCContext
+                from nexus_engine.npc.ensemble import npc_tick
                 context = NPCContext(
                     world_time=self._game_time,
                     current_location=region.locations[0] if region.locations else EntityId(),
                     player_location=self.player_location,
                 )
-                events = await npc.tick(delta, context)
+                events = await npc_tick(npc, delta, context)
                 all_events.extend(events)
 
         for region in regions.get(RegionType.NEARBY, []):

@@ -179,6 +179,7 @@ class SQLiteEventStore(EventStore):
     def query(self, filter: EventFilter) -> AsyncIterator[Event]:
         if not self._conn:
             raise RuntimeError("EventStore not initialized")
+        conn = self._conn
 
         async def _query() -> AsyncIterator[Event]:
             query = "SELECT raw FROM events WHERE 1=1"
@@ -205,7 +206,7 @@ class SQLiteEventStore(EventStore):
             query += " ORDER BY game_time LIMIT ?"
             params.append(filter.limit)
 
-            async with self._conn.execute(query, params) as cursor:
+            async with conn.execute(query, params) as cursor:
                 async for row in cursor:
                     yield self._deserialize_event(json.loads(row[0]))
 
@@ -214,9 +215,10 @@ class SQLiteEventStore(EventStore):
     def get_since(self, time: GameTime) -> AsyncIterator[Event]:
         if not self._conn:
             raise RuntimeError("EventStore not initialized")
+        conn = self._conn
 
         async def _get_since() -> AsyncIterator[Event]:
-            async with self._conn.execute(
+            async with conn.execute(
                 "SELECT raw FROM events WHERE game_time >= ? ORDER BY game_time",
                 (time.ticks,),
             ) as cursor:
@@ -230,6 +232,7 @@ class SQLiteEventStore(EventStore):
     ) -> AsyncIterator[Event]:
         if not self._conn:
             raise RuntimeError("EventStore not initialized")
+        conn = self._conn
 
         async def _get_history() -> AsyncIterator[Event]:
             query = "SELECT raw FROM events WHERE actor_id = ? OR targets LIKE ?"
@@ -238,7 +241,7 @@ class SQLiteEventStore(EventStore):
                 query += " AND game_time >= ?"
                 params.append(since.ticks)
             query += " ORDER BY game_time"
-            async with self._conn.execute(query, params) as cursor:
+            async with conn.execute(query, params) as cursor:
                 async for row in cursor:
                     yield self._deserialize_event(json.loads(row[0]))
 
@@ -247,6 +250,7 @@ class SQLiteEventStore(EventStore):
     async def count(self) -> int:
         if not self._conn:
             raise RuntimeError("EventStore not initialized")
-        async with self._conn.execute("SELECT COUNT(*) FROM events") as cursor:
+        conn = self._conn
+        async with conn.execute("SELECT COUNT(*) FROM events") as cursor:
             row = await cursor.fetchone()
             return row[0] if row else 0

@@ -130,8 +130,8 @@ def new_ability_id() -> AbilityId:
 
 
 def new_goal_id() -> GoalId:
-    return uuid4()  # type: ignore[return-value]
+    return str(uuid4())
 
 
 def new_drive_id() -> DriveId:
-    return uuid4()  # type: ignore[return-value]
+    return str(uuid4())
